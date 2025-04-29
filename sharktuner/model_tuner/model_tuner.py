@@ -8,6 +8,7 @@ import logging
 import argparse
 import shutil
 from pathlib import Path
+from typing import Sequence
 from sharktuner import libtuner
 from sharktuner import common
 from typing import Optional
@@ -53,7 +54,7 @@ def read_flags_file(flags_file: str) -> list[str]:
         return file.read().splitlines()
 
 
-def arg_parse() -> argparse.Namespace:
+def arg_parse(parser_args: Sequence[str] | None = None) -> argparse.Namespace:
     # Custom arguments for the example tuner file.
     parser = argparse.ArgumentParser(description="Autotune sample script")
     client_args = parser.add_argument_group("Shark Tuner Options")
@@ -105,12 +106,12 @@ def arg_parse() -> argparse.Namespace:
         help="Time budget in minutes for model benchmark phase.",
     )
     # Remaining arguments come from libtuner
-    args = libtuner.parse_arguments(parser)
+    args = libtuner.parse_arguments(parser, parser_args)
     return args
 
 
-def main() -> None:
-    args = arg_parse()
+def main(parser_args: Sequence[str] | None = None) -> None:
+    args = arg_parse(parser_args)
 
     path_config = libtuner.PathConfig()
     path_config.base_dir.mkdir(parents=True, exist_ok=True)
