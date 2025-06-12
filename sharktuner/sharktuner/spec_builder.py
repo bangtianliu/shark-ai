@@ -91,12 +91,20 @@ def build_td_spec(
         ["!transform.any_op"] + ["!transform.any_param"] * len(yield_vars)
     )
 
-    spec_text = f"""
-    module attributes {{ transform.with_named_sequence, iree_codegen.tuning_spec_with_default_entrypoint }} {{
+    annotation_args = ", ".join(
+        f"%cfg_{i}: !transform.any_param {{transform.readonly}}"
+        for i in range(len(config_list))
+    )
+    annotation_lines = "\n".join(
+        f'                transform.annotate %op "{key}" = %cfg_{i} : !transform.any_op, !transform.any_param'
+        for i, (key, _) in enumerate(config_list)
+    )
+
+    spec_text = f"""\
+        module attributes {{ transform.with_named_sequence, iree_codegen.tuning_spec_with_default_entrypoint }} {{
         // Annotation Transform
-        transform.named_sequence @apply_op_config(%op: !transform.any_op {{transform.readonly}},
-                                                    {", ".join(f"%cfg_{i}: !transform.any_param {{transform.readonly}}" for i in range(len(config_list)))}) {{
-{"".join([f"                transform.annotate %op \"{key}\" = %cfg_{i} : !transform.any_op, !transform.any_param\n" for i, (key, _) in enumerate(config_list)])}
+        transform.named_sequence @apply_op_config(%op: !transform.any_op {{transform.readonly}}, {annotation_args}) {{
+        {annotation_lines}
             transform.yield
         }}
 
@@ -104,8 +112,8 @@ def build_td_spec(
         transform.named_sequence @{func_name}(%cont: !transform.any_op {{transform.readonly}})
             -> ({yield_types}) {{
             %ins, %outs = transform.iree.match.cast_compatible_dag_from_root %cont {{
-            ^bb0({bbargs_str}):
-            {root_operation}
+              ^bb0({bbargs_str}):
+              {root_operation}
             }} : (!transform.any_op) -> (!transform.any_value, !transform.any_value)
             {config_block}
             transform.yield {yield_list} : {yield_types}
@@ -120,6 +128,5 @@ def build_td_spec(
             : (!transform.any_op) -> !transform.any_op
             transform.yield %res : !transform.any_op
         }}
-    }}
-    """
+    }}"""
     return ir.Module.parse(spec_text, context)
