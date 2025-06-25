@@ -11,7 +11,6 @@ tightly coupled transformer blocks a bit less "stringy" with loose tensors
 and dims floating around everywhere.
 """
 
-from itertools import accumulate
 from typing import Optional, Union, List
 
 import math
@@ -32,7 +31,16 @@ from sharktank.types import (
 from sharktank import ops, kernels
 from sharktank.kernels.mlir_kernel import *
 
-__all__ = ["PagedAttention"]
+__all__ = ["PagedAttention", "attn_type_map"]
+
+
+attn_type_map = {
+    "llama": "gqa",
+    "grok": "gqa",
+    "deepseek2": "mla",
+    "llama4": "gqa",
+}
+
 
 # Paged Attention Kernels
 #
@@ -986,6 +994,12 @@ class PagedAttention:
         mask: Optional[torch.Tensor] = None,
         probs_quantizer: Optional[StaticScaledQuantizer] = None,
     ):
+        if attention_kernel not in ["decomposed", "sharktank", "torch"]:
+            raise ValueError(
+                f"Unsupported attention kernel: {attention_kernel}. "
+                "Supported kernels: decomposed, sharktank, torch."
+            )
+
         if self.attn_type == "gqa":
             k, v = self.gqa(head_count_attn, k, v)
 
