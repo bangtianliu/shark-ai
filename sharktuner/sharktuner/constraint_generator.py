@@ -687,22 +687,36 @@ class AttentionOpInterfaceConstraintGenerator(ConstraintGenerator):
         assert k_dims, "no key dims from attention op"
         assert v_dims, "no value dims from attention op"
 
+        # Helper function to get dimension sizes from shapes.
+        def get_dim_sizes(
+            shape: list[int], dim_positions: list[int], target_dims: list[int]
+        ) -> list[int]:
+            return [shape[dim_positions.index(dim)] for dim in target_dims]
+
+        batch_sizes = get_dim_sizes(q_shape, q_dims, self.opinfo.batch_dims)
+        m_sizes = get_dim_sizes(q_shape, q_dims, self.opinfo.m_dims)
+        k1_sizes = get_dim_sizes(q_shape, q_dims, self.opinfo.k1_dims)
+        k2_sizes = get_dim_sizes(k_shape, k_dims, self.opinfo.k2_dims)
+        n_sizes = get_dim_sizes(v_shape, v_dims, self.opinfo.n_dims)
+
         self.qk_matmul = common.MatmulShapeType(
-            m=q_shape[q_dims.index(mDim)],
-            n=k_shape[k_dims.index(k2Dim)],
-            k=q_shape[q_dims.index(k1Dim)],
+            m=m_sizes,
+            n=k2_sizes,
+            k=k1_sizes,
+            batch=batch_sizes,
             lhs_type=q_type.element_type,
             rhs_type=k_type.element_type,
             acc_type=f32_type,
         )
 
         self.pv_matmul = common.MatmulShapeType(
-            m=q_shape[q_dims.index(mDim)],
-            n=v_shape[v_dims.index(nDim)],
-            k=v_shape[v_dims.index(k2Dim)],
+            m=m_sizes,
+            n=n_sizes,
+            k=k2_sizes,
+            batch=batch_sizes,
             lhs_type=v_type.element_type,
             rhs_type=v_type.element_type,
-            acc_type=output_type,
+            acc_type=f32_type,
         )
 
     def generate_solutions(

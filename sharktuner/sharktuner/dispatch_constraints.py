@@ -22,16 +22,48 @@ from . import common
 
 @dataclass
 class GPUMMASchedule:
+    # When there are multiple M, N, or K dimensions, the intrinsic sizes are
+    # targeted to the innermost dimension, and the outer dimensions can be
+    # thought of as unrolling factors along M, N, or K.
+
+    # Native MMA Intrinsic size.
     m_size: z3.ArithRef
     n_size: z3.ArithRef
     k_size: z3.ArithRef
 
-    m_subgroup_counts: z3.ArithRef
-    n_subgroup_counts: z3.ArithRef
+    # Number of subgroups along each M and N dimension.
+    m_subgroup_counts: list[z3.ArithRef]
+    n_subgroup_counts: list[z3.ArithRef]
 
-    m_tile_size: z3.ArithRef
-    n_tile_size: z3.ArithRef
-    k_tile_size: z3.ArithRef
+    # M/N/K tile sizes per subgroup.
+    m_tile_size: list[z3.ArithRef]
+    n_tile_size: list[z3.ArithRef]
+    k_tile_size: list[z3.ArithRef]
+
+
+def create_mma_schedule(
+    prefix: str, num_m_dims: int = 1, num_n_dims: int = 1, num_k_dims: int = 1
+) -> GPUMMASchedule:
+    """
+    Create a GPUMMASchedule with Z3 variables for constraint generation.
+    """
+    return GPUMMASchedule(
+        # Native MMA intrinsic sizes.
+        m_size=z3.Int(f"{prefix}_mma_m_size"),
+        n_size=z3.Int(f"{prefix}_mma_n_size"),
+        k_size=z3.Int(f"{prefix}_mma_k_size"),
+        # Subgroup counts for each dimension.
+        m_subgroup_counts=[
+            z3.Int(f"{prefix}_m_subgroup_count_{i}") for i in range(num_m_dims)
+        ],
+        n_subgroup_counts=[
+            z3.Int(f"{prefix}_n_subgroup_count_{i}") for i in range(num_n_dims)
+        ],
+        # Tile sizes for each dimension.
+        m_tile_size=[z3.Int(f"{prefix}_m_tile_size_{i}") for i in range(num_m_dims)],
+        n_tile_size=[z3.Int(f"{prefix}_n_tile_size_{i}") for i in range(num_n_dims)],
+        k_tile_size=[z3.Int(f"{prefix}_k_tile_size_{i}") for i in range(num_k_dims)],
+    )
 
 
 @dataclass
@@ -414,9 +446,19 @@ def calculate_schedule_input_operands_shared_memory_usage_in_bytes(
     Computes the shared memory usage (in bytes) for input operands
     (LHS and RHS) in the given MMA schedule.
     """
-    tile_m = schedule.m_size * schedule.m_tile_size * schedule.m_subgroup_counts
-    tile_n = schedule.n_size * schedule.n_tile_size * schedule.n_subgroup_counts
-    tile_k = schedule.k_size * schedule.k_tile_size
+
+    # Helper function to compute product of Z3 expressions.
+    def z3_prod(values: list[z3.ArithRef]) -> z3.ArithRef:
+        if not values:
+            return z3.IntVal(1)
+        result = values[0]
+        for val in values[1:]:
+            result = result * val
+        return result
+
+    tile_m = schedule.m_size * z3_prod(schedule.m_tile_size) * z3_prod(schedule.m_subgroup_counts)
+    tile_n = schedule.n_size * z3_prod(schedule.n_tile_size) * z3_prod(schedule.n_subgroup_counts)
+    tile_k = schedule.k_size * z3_prod(schedule.k_tile_size)
 
     lhs_bits = lhs_type.width
     rhs_bits = rhs_type.width
