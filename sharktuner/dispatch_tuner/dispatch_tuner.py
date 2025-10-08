@@ -7,6 +7,7 @@
 import logging
 import argparse
 from pathlib import Path
+import sys
 from sharktuner import libtuner
 from sharktuner import common
 from typing import Optional
@@ -83,8 +84,8 @@ def arg_parse() -> argparse.Namespace:
         default=None,
         help="Time budget in minutes for disptach benchmark phase.",
     ),
-    # Remaining arguments come from libtuner.
-    args = libtuner.parse_arguments(parser)
+    # Remaining arguments come from libtuner
+    args = libtuner.parse_arguments(sys.argv, parser)
     return args
 
 
