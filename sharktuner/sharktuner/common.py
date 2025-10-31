@@ -381,8 +381,13 @@ def combine_tuning_specs(
             "transform.with_named_sequence"
         ] = ir.UnitAttr.get()
 
-        for td_spec in td_specs:
-            top_module.body.append(td_spec.operation.clone())
+        for idx, td_spec in enumerate(td_specs):
+            module = td_spec.operation.clone()
+            if "iree_codegen.tuning_spec_with_default_entrypoint" in module.attributes:
+                module.attributes["sym_name"] = ir.StringAttr.get(
+                    f"module{hash((str(top_module), str(module)))}"
+                )
+            top_module.body.append(module)
         return top_module
 
 
